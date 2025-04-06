@@ -6,34 +6,16 @@ import os
 import sentinelhub
 from dotenv import load_dotenv
 import numpy as np
-import requests
-import datetime
-import subprocess
-import shlex
 import json
 import math
-import folium
-import calendar
-from datetime import date, timedelta
 import pandas as pd
 from sentinelhub.api.catalog import SentinelHubCatalog
 from sentinelhub import (
-    SHConfig,
     CRS,
     BBox,
-    BBoxSplitter,
-    CustomGridSplitter,
-    OsmSplitter,
-    TileSplitter,
-    UtmGridSplitter,
-    UtmZoneSplitter,
     DataCollection,
-    DownloadRequest,
     MimeType,
-    MosaickingOrder,
-    SentinelHubDownloadClient,
     SentinelHubRequest,
-    read_data,
     bbox_to_dimensions,
 )
 import imageio.v2 as imageio
@@ -59,8 +41,11 @@ CATALOG_API_URL = "https://services.sentinel-hub.com/api/v1/catalog/1.0.0/search
 def segment_aoi(
     aoi: sentinelhub.BBox, resolution: int, output: Literal["grid", "flat"]
 ) -> np.array:
-    if resolution < 10:
-        resolution = 10  # Enforce minimum resolution
+    """
+    segments the given BBox into chunks based on the passed resolution
+    return: array of smaller/segmented BBox objects
+    """
+    resolution = max(resolution, 10)
 
     width_px, height_px = bbox_to_dimensions(bbox=aoi, resolution=resolution)
     num_rows = math.ceil(height_px / 1500)
@@ -90,13 +75,17 @@ def segment_aoi(
         return aios_grid
 
 
-def create_aoi_bbox_map(aois: np.array) -> Dict[str, BBox]:
-    aoi_bbox_map = {}
-    for i, row in enumerate(aois):
+def create_aoi_bbox_dict(aoi_segments: np.array) -> Dict[str, BBox]:
+    """
+    creates simple aoi id's and maps them to the BBox objects
+    return: Dict[aoi_id, BBox]
+    """
+    aoi_bbox_dict = {}
+    for i, row in enumerate(aoi_segments):
         for j, aoi_bbox in enumerate(row):
             aoi_id = str(i).zfill(2) + str(j).zfill(2)
-            aoi_bbox_map[aoi_id] = aoi_bbox
-    return aoi_bbox_map
+            aoi_bbox_dict[aoi_id] = aoi_bbox
+    return aoi_bbox_dict
 
 
 ###########################################################################################
@@ -105,28 +94,29 @@ def create_aoi_bbox_map(aois: np.array) -> Dict[str, BBox]:
 def create_aoi_catalog_dict(
     catalog: SentinelHubCatalog,
     time_interval: tuple,
-    aoi_bbox_map: dict,
+    aoi_bbox_dict: dict,
     save_file=False,
-) -> dict:
+    file_name="catalog.json",
+) -> Dict[str, Dict[str, float]]:
+    # Dict[aoi_id, Dict[time_stamp, could_coverage]]
     aoi_catalog_dict = {}
-    for aoi_id in aoi_bbox_map.keys():
-        aoi_id = aoi_id
-        aoi_bbox = aoi_bbox_map[aoi_id]
+    for aoi_id, aoi_bbox in aoi_bbox_dict.items():
         # get catalog content for sub aoi
-        aoi_catalog_results = get_aoi_catalog_results(
+        aoi_catalog_dict[aoi_id] = get_aoi_catalog_results(
             catalog, time_interval, aoi_bbox
         )
-        aoi_catalog_dict[aoi_id] = aoi_catalog_results
     if save_file:
         if not os.path.exists("data"):
             os.makedirs("data")
-        with open("data/AOI_CATALOG.json", "w") as file:
+        with open(f"data/{file_name}", "w") as file:
             json.dump(aoi_catalog_dict, file)
 
     return aoi_catalog_dict
 
 
-def get_aoi_catalog_results(catalog: SentinelHubCatalog, time_interval: tuple, aoi_bbox: BBox):
+def get_aoi_catalog_results(
+    catalog: SentinelHubCatalog, time_interval: tuple, aoi_bbox: BBox
+) -> Dict[str, float]:
     search_iterator = catalog.search(
         DataCollection.SENTINEL2_L2A,
         bbox=aoi_bbox,
@@ -137,35 +127,65 @@ def get_aoi_catalog_results(catalog: SentinelHubCatalog, time_interval: tuple, a
             "exclude": ["id"],
         },
     )
-    # aoi_catalog_results = list(search_iterator)
     aoi_catalog_results = {}
     for result in search_iterator:
-        ts = result["properties"]["datetime"]
-        cc = result["properties"]["eo:cloud_cover"]
-        aoi_catalog_results[ts] = cc
+        time_stamp = result["properties"]["datetime"]
+        cloud_coverage = result["properties"]["eo:cloud_cover"]
+        aoi_catalog_results[time_stamp] = cloud_coverage
     return aoi_catalog_results
 
-def create_aoi_catalog_df(catalog: dict):
-    # doesnt work for newer data
-    print("creating AOI_CATALOG_DF")
-    aoi_catalog_rows = []
-    for AOI in catalog.keys():
-        aoi_id = AOI
-        aoi_recs = catalog[aoi_id]
-        for AOI_REC in aoi_recs.keys():
-            AOI_REC_TS = AOI_REC
-            AOI_REC_CC = aoi_recs[AOI_REC]
-            aoi_catalog_rows.append(
-                {"AOI_ID": aoi_id, "TS": AOI_REC_TS, "CC": float(AOI_REC_CC)}
+
+def create_aoi_df(
+    aoi_catalog_dict: Dict[str, Dict[str, list[float]]], aoi_bbox_dict: Dict[str, BBox]
+) -> pd.DataFrame:
+    rows = []
+    for aoi_id, records in aoi_catalog_dict.items():
+        bbox = aoi_bbox_dict[aoi_id]
+        for time_stamp, values in records.items():
+            row = {
+                "aoi_id": aoi_id,
+                "bbox": bbox,
+                "time_stamp": time_stamp,
+                "cloud_coverage_api": values[0],
+                "cloud_coverage_calculated": values[1],
+            }
+            if len(values) > 2:
+                row["file_name"] = values[2]
+            rows.append(row)
+
+    return pd.DataFrame(rows)
+
+
+###########################################################################################
+# Image Download Functions
+###########################################################################################
+def load_evalscript(path: str):
+    with open(path, "r") as f:
+        evalscript = f.read()
+    return evalscript
+
+
+def get_img(evalscript, timestamp, bbox, resolution, config):
+    bbox_size = bbox_to_dimensions(bbox, resolution=resolution)
+    request_image = SentinelHubRequest(
+        evalscript=evalscript,
+        input_data=[
+            SentinelHubRequest.input_data(
+                data_collection=DataCollection.SENTINEL2_L2A,
+                time_interval=timestamp,
             )
-            aoi_catalog_df = pd.DataFrame(aoi_catalog_rows)
-            # create UID ({AOI_ID}_{TS})
-            aoi_catalog_df["UID"] = (
-                aoi_catalog_df["AOI_ID"] + "_" + aoi_catalog_df["TS"]
-            )
-            # set datatypes for columns
-            aoi_catalog_df = aoi_catalog_df.astype(
-                {"AOI_ID": "string", "TS": "string", "CC": "float", "UID": "string"}
-            )
-    print(f"> created DF has {len(aoi_catalog_df.index)} entries")
-    return aoi_catalog_df
+        ],
+        # TODO: für .tiff Bilder MimeType.TIFF setze
+        responses=[SentinelHubRequest.output_response("default", MimeType.PNG)],
+        bbox=bbox,
+        size=bbox_size,
+        config=config,
+    )
+    imgs = request_image.get_data()
+
+    return imgs[0]
+
+
+def download_img(img, filename: str, path="images"):
+    save_path = os.path.join(path, filename)
+    imageio.imwrite(save_path, img)
