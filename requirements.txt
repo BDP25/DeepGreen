@@ -7,3 +7,4 @@ imageio~=2.37.0
 dotenv~=0.9.9
 python-dotenv~=1.1.0
 pillow~=11.1.0
+pytest~=8.3.5
