@@ -22,7 +22,7 @@ from sentinelhub import (
     bbox_to_dimensions,
 )
 import imageio.v2 as imageio
-from typing import Literal, Dict
+from typing import Literal, Dict, Any
 
 ###########################################################################################
 # Credentials
@@ -59,7 +59,7 @@ def segment_aoi(
     lat_step = (y_max - y_min) / num_rows
     lon_step = (x_max - x_min) / num_cols
 
-    aios_grid = np.empty((num_rows, num_cols), dtype=object)
+    aois_grid = np.empty((num_rows, num_cols), dtype=object)
 
     for row in range(num_rows):
         for col in range(num_cols):
@@ -68,15 +68,15 @@ def segment_aoi(
             max_x_new = min(x_max, min_x_new + lon_step)
             max_y_new = min(y_max, min_y_new + lat_step)
 
-            aios_grid[row, col] = BBox(
+            aois_grid[row, col] = BBox(
                 bbox=(min_x_new, min_y_new, max_x_new, max_y_new), crs=CRS.WGS84
             )
 
     if output == "flat":
-        aois_flat = aios_grid.flatten()
+        aois_flat = aois_grid.flatten()
         return aois_flat
     if output == "grid":
-        return aios_grid
+        return aois_grid
 
 
 def create_aoi_bbox_dict(aoi_segments: np.array) -> Dict[str, BBox]:
@@ -102,7 +102,7 @@ def create_aoi_catalog_dict(
     save_file=False,
     file_name="catalog.json",
     dir_path=Path("data"),
-) -> Dict[str, Dict[str, float]]:
+) -> Dict[str, Dict[str, list[float]]]:
     # Dict[aoi_id, Dict[time_stamp, could_coverage]]
     aoi_catalog_dict = {}
     for aoi_id, aoi_bbox in aoi_bbox_dict.items():
@@ -121,7 +121,7 @@ def create_aoi_catalog_dict(
 
 def get_aoi_catalog_results(
     catalog: SentinelHubCatalog, time_interval: tuple, aoi_bbox: BBox
-) -> Dict[str, float]:
+) -> dict[Any, list[Any]]:
     search_iterator = catalog.search(
         DataCollection.SENTINEL2_L2A,
         bbox=aoi_bbox,
@@ -136,7 +136,7 @@ def get_aoi_catalog_results(
     for result in search_iterator:
         time_stamp = result["properties"]["datetime"]
         cloud_coverage = result["properties"]["eo:cloud_cover"]
-        aoi_catalog_results[time_stamp] = cloud_coverage
+        aoi_catalog_results[time_stamp] = [cloud_coverage]
     return aoi_catalog_results
 
 
@@ -151,9 +151,10 @@ def create_aoi_df(
                 "aoi_id": aoi_id,
                 "bbox": bbox,
                 "time_stamp": time_stamp,
-                "cloud_coverage_api": values[0],
-                "cloud_coverage_calculated": values[1],
+                "cloud_coverage_api": values[0]
             }
+            if len(values) > 1:
+                row["cloud_coverage_calculated"] = values[1]
             if len(values) > 2:
                 row["file_name"] = values[2]
             rows.append(row)
@@ -164,10 +165,10 @@ def create_aoi_df(
 ###########################################################################################
 # Image Download Functions
 ###########################################################################################
-def load_evalscript(path: str):
+def load_eval_script(path: str) -> str:
     with open(path, "r") as f:
-        evalscript = f.read()
-    return evalscript
+        eval_script = f.read()
+    return eval_script
 
 
 def get_img(evalscript, timestamp, bbox, resolution, config):
