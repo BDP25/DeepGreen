@@ -1,9 +1,12 @@
 ###########################################################################################
 # Modules
 ###########################################################################################
+
 import os
+from pathlib import Path
 
 import sentinelhub
+
 from dotenv import load_dotenv
 import numpy as np
 import json
@@ -27,6 +30,7 @@ from typing import Literal, Dict
 load_dotenv()
 CLIENT_ID = os.environ.get("SENTINEL_HUB_CLIENT_ID")
 CLIENT_SECRET = os.environ.get("SENTINEL_HUB_CLIENT_SECRET")
+
 ###########################################################################################
 # URL's
 ###########################################################################################
@@ -97,6 +101,7 @@ def create_aoi_catalog_dict(
     aoi_bbox_dict: dict,
     save_file=False,
     file_name="catalog.json",
+    dir_path=Path("data"),
 ) -> Dict[str, Dict[str, float]]:
     # Dict[aoi_id, Dict[time_stamp, could_coverage]]
     aoi_catalog_dict = {}
@@ -106,9 +111,9 @@ def create_aoi_catalog_dict(
             catalog, time_interval, aoi_bbox
         )
     if save_file:
-        if not os.path.exists("data"):
-            os.makedirs("data")
-        with open(f"data/{file_name}", "w") as file:
+        dir_path.mkdir(exist_ok=True)
+        filepath = dir_path / file_name
+        with open(filepath, "w") as file:
             json.dump(aoi_catalog_dict, file)
 
     return aoi_catalog_dict
@@ -186,6 +191,7 @@ def get_img(evalscript, timestamp, bbox, resolution, config):
     return imgs[0]
 
 
-def download_img(img, filename: str, path="images"):
-    save_path = os.path.join(path, filename)
-    imageio.imwrite(save_path, img)
+def download_img(img, filename: str, dir_path=Path("images")) -> None:
+    dir_path.mkdir(exist_ok=True)
+    filepath = dir_path / filename
+    imageio.imwrite(filepath, img)
