@@ -44,14 +44,14 @@ def calculate_red_coverage(image, red_threshold=50, factor=1.2):
 
 
 def calculate_cloud_coverage(
-    aoi_catalog_dict: Dict[str, Dict[str, float]],
+    aoi_catalog_dict: Dict[str, Dict[str, list[float]]],
     aoi_bbox_dict: Dict[str, BBox],
     resolution: int,
     config: SHConfig,
     download_images: bool = False,
 ) -> dict[str, dict[str, list[float | str]]]:
     aoi_dict = {}
-    eval_script = sentinel_hub_functions.load_evalscript(
+    eval_script = sentinel_hub_functions.load_eval_script(
         "evalscripts/es_true_color_clm.js"
     )
     for aoi_id, aoi_recs in aoi_catalog_dict.items():
