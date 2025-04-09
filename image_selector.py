@@ -1,5 +1,8 @@
+from pathlib import Path
+
 from functions import sentinel_hub_functions
 from functions import cloud_coverage_functions
+from functions import html_table_functions
 import pandas as pd
 from dotenv import load_dotenv
 import os
@@ -11,14 +14,11 @@ from sentinelhub import (
 )
 
 # paths
-if not os.path.exists("data"):
-    os.makedirs("data")
+DATA_DIR = Path("data")
+IMAGES_DIR = Path("images")
 
-if not os.path.exists("images"):
-    os.makedirs("images")
-
-DATA_DIR = "data"
-IMAGES_DIR = "images"
+DATA_DIR.mkdir(exist_ok=True)
+IMAGES_DIR.mkdir(exist_ok=True)
 
 # credentials
 load_dotenv()
@@ -59,9 +59,15 @@ aoi_catalog_dict_with_clouds = cloud_coverage_functions.calculate_cloud_coverage
     download_images=True,
 )
 
-# create df: aoi_id, bbox, time_stamp, cloud_coverage_api, cloud_coverage_calculated, (file_name)
+# create df with columns: aoi_id, bbox, time_stamp, cloud_coverage_api, cloud_coverage_calculated, (file_name)
 aoi_df = sentinel_hub_functions.create_aoi_df(
     aoi_catalog_dict_with_clouds, aoi_bbox_dict_wt
 )
 
-aoi_df.to_csv("data/aoi_df.csv", index=False)
+aoi_df.to_csv(DATA_DIR / "aoi_df.csv", index=False)
+
+# df = pd.read_csv("data/aoi_df.csv", dtype={"aoi_id": str})
+
+# create html table and safe
+html_table = html_table_functions.create_html_table(aoi_df)
+html_table_functions.save_html_table(html_table, dir_path=DATA_DIR)
