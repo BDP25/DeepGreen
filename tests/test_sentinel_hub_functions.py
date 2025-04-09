@@ -106,8 +106,8 @@ def test_get_aoi_catalog_results(catalog, time_interval, aoi_segments):
 def test_create_aoi_df(aoi_catalog_dict, aoi_bbox_dict):
     df = create_aoi_df(aoi_catalog_dict, aoi_bbox_dict)
     assert "aoi_id" in df.columns
-    assert"bbox" in df.columns
-    assert"time_stamp" in df.columns
+    assert "bbox" in df.columns
+    assert "time_stamp" in df.columns
     assert "cloud_coverage_api" in df.columns
 
 def test_load_eval_script():
