@@ -1,6 +1,7 @@
 """
 Utilities used by example notebooks
 """
+
 from typing import Any, Optional, Tuple
 
 import matplotlib.pyplot as plt
