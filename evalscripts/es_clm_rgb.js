@@ -1,4 +1,5 @@
-//VERSION=3
+// VERSION=3
+// returns CLM as overlay on rgb (red)
 function setup() {
     return {
         input: [{
@@ -12,7 +13,7 @@ function setup() {
   
 function evaluatePixel(sample) {
     if (sample.CLM == 1) {
-        return [0.75 + sample.B04, sample.B03, sample.B02]
+        return [1 + sample.B04, sample.B03, sample.B02]
         }
     return [3.5*sample.B04, 3.5*sample.B03, 3.5*sample.B02];
   }

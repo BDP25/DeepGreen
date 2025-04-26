@@ -1,5 +1,5 @@
-
-//VERSION=3
+// VERSION=3
+// returns all bands
 function setup() {
     return {
         input: [{
