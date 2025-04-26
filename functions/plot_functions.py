@@ -22,3 +22,9 @@ def plot_image(
         ax.imshow(image * factor, **kwargs)
     ax.set_xticks([])
     ax.set_yticks([])
+
+
+def show_img(img: np.ndarray) -> None:
+    plt.imshow(img)
+    plt.axis('off') 
+    plt.show()
