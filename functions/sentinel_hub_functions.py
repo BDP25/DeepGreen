@@ -20,6 +20,7 @@ from sentinelhub import (
     MimeType,
     SentinelHubRequest,
     bbox_to_dimensions,
+    SHConfig
 )
 import imageio.v2 as imageio
 from typing import Literal, Dict, Any
@@ -171,7 +172,7 @@ def load_eval_script(path: str) -> str:
     return eval_script
 
 
-def get_img(evalscript, timestamp, bbox, resolution, config):
+def get_img(evalscript: str, timestamp: str, bbox: BBox, resolution: int, config: SHConfig) -> np.ndarray:
     bbox_size = bbox_to_dimensions(bbox, resolution=resolution)
     request_image = SentinelHubRequest(
         evalscript=evalscript,
