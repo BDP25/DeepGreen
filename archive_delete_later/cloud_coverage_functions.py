@@ -1,7 +1,7 @@
 from typing import Dict
 import numpy as np
 from sentinelhub import BBox, SHConfig
-from functions import sentinel_hub_functions
+from archive_delete_later import sentinel_hub_functions
 
 
 def calculate_red_coverage(image, red_threshold=50, factor=1.2):

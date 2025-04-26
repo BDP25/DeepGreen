@@ -1,12 +1,8 @@
-import os
 import re
 
-import numpy as np
 import pytest
-from dotenv import load_dotenv
-from sentinelhub import CRS, BBox, SHConfig, SentinelHubCatalog
 
-from functions.sentinel_hub_functions import *
+from archive_delete_later.sentinel_hub_functions import *
 
 
 @pytest.fixture
