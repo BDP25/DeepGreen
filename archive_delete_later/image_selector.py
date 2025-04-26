@@ -1,9 +1,6 @@
 from pathlib import Path
 
-from functions import sentinel_hub_functions
-from functions import cloud_coverage_functions
-from functions import html_table_functions
-import pandas as pd
+from archive_delete_later import cloud_coverage_functions, html_table_functions, sentinel_hub_functions
 from dotenv import load_dotenv
 import os
 from sentinelhub.api.catalog import SentinelHubCatalog
@@ -14,8 +11,8 @@ from sentinelhub import (
 )
 
 # paths
-DATA_DIR = Path("data")
-IMAGES_DIR = Path("images")
+DATA_DIR = Path("../data")
+IMAGES_DIR = Path("../images")
 
 DATA_DIR.mkdir(exist_ok=True)
 IMAGES_DIR.mkdir(exist_ok=True)
