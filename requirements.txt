@@ -8,3 +8,6 @@ dotenv~=0.9.9
 python-dotenv~=1.1.0
 pillow~=11.1.0
 pytest~=8.3.5
+GitPython~=3.1.44
+ipython~=9.2.0
+matplotlib~=3.10.1
