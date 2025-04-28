@@ -3,12 +3,12 @@
 function setup() {
     return {
         input: [{
-            bands: ["B01","B02","B03","B04","B05","B06","B07","B08","B8A","B09","B10","B11","B12"],
+            bands: ["B01","B02","B03","B04","B05","B06","B07","B08","B8A","B09","B11","B12"],
             units: "DN"
         }],
         output: {
-            bands: 13,
-            sampleType: "INT16"
+            bands: 12,
+            sampleType: "AUTO"
         }
     };
 }
@@ -23,7 +23,6 @@ function evaluatePixel(sample) {
             sample.B08,
             sample.B8A,
             sample.B09,
-            sample.B10,
             sample.B11,
             sample.B12];
 }
