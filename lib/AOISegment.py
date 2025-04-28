@@ -3,9 +3,8 @@ import numpy as np
 import pandas as pd
 from git import Repo
 from pathlib import Path
-from typing import Literal
 from dotenv import load_dotenv
-from archive_delete_later import sentinel_hub_functions
+from lib.utils import load_eval_script
 from sentinelhub import BBox, SentinelHubCatalog, DataCollection, CRS, SHConfig, SentinelHubRequest, bbox_to_dimensions, \
     MimeType
 
@@ -22,28 +21,119 @@ class AOISegment:
         repo = Repo(Path(__file__).resolve(), search_parent_directories=True)
         self.project_root = Path(repo.git.rev_parse("--show-toplevel"))
 
-        # data containers
-        self.df_all_data = pd.DataFrame(
-            columns=["time_stamp", "cloud_coverage_api", "cloud_coverage_calculated"])
-        self.df_land_use_evolution = pd.DataFrame(
-            columns=["time_stamp", "cloud_coverage_api", "cloud_coverage_calculated", "buildup_pct",
-                     "green_pct", "water_pct", "rest_pct"])
+        # eval scripts
+        self.eval_script_cloud = load_eval_script(str(self.project_root / "eval_scripts" / "es_clm_binary.js"))
+        self.eval_script_buildup = load_eval_script(str(self.project_root / "eval_scripts" / "es_bua_binary.js"))
+        self.eval_script_green = load_eval_script(str(self.project_root / "eval_scripts" / "es_gc_binary.js"))
+        # self.eval_script_water = load_eval_script(self.project_root / "eval_scripts" / "es_clm_binary.js")  # TODO
 
-        # run calculations
-        self.run_calculations()
+        # data containers for statistical values
+        self.df = pd.DataFrame(
+            columns=["time_stamp", "cloud_coverage_api", "cloud_coverage_calculated", "cloud_mask", "combined_mask"])
 
-    def run_calculations(self) -> None:
+    def run_and_save_calculations(self) -> None:
         """
         Executes all calculations for cloud coverage, buildup area, green area and water area
+        Saves resulst in data directory
         """
-        self.get_cloud_coverage_api()
-        self.calculate_area_pct("cloud_coverage_calculated")
-        self.df_all_data = self.df_all_data.drop_duplicates(subset='time_stamp', keep='first')
-        self.extract_good_candidates(threshold=100)
-        # add "water_pct" wne implemented
-        for area_type in ["buildup_pct", "green_pct", "water_pct"]:
-            self.calculate_area_pct(area_type)
-        self.save_csv()
+        # prepare save folder
+        bbox_name = f"{self.bbox.min_x}_{self.bbox.min_y}_{self.bbox.max_x}_{self.bbox.max_y}"
+        save_dir = self.project_root / "data" / bbox_name
+        save_dir.mkdir(parents=True, exist_ok=True)
+
+        # prepare evolution tracking
+        evolution_csv_path = save_dir / "evolution.csv"
+        if not evolution_csv_path.exists():
+            with open(evolution_csv_path, "w") as f:
+                f.write(
+                    "time_stamp,cloud_coverage_api,cloud_coverage_calculated,buildup_pct,green_pct,water_pct,empty_pct\n")
+
+        # get available time stamps and cloud coverage (api value)
+        self.get_time_stamps_and_api_cloud_coverage()
+        self.df = self.df.drop_duplicates(subset="time_stamp", keep="first")  # because the api is literal ass cancer
+
+        # calculate could coverage based on could mask script
+        self.calculate_clouds()
+
+        # only use images with low cloud coverage in api and calculated value (default < 20 %)
+        self.extract_good_candidates()
+        for i, row in self.df.iterrows():
+            timestamp_str = str(row["time_stamp"])[:10]
+
+            # get masks
+            cloud_mask = np.array(row["cloud_mask"])
+            buildup_mask = self.get_img(eval_script=self.eval_script_buildup, time_stamp=timestamp_str)
+            green_mask = self.get_img(eval_script=self.eval_script_green, time_stamp=timestamp_str)
+            # water_mask = self.get_img(eval_script=self.eval_script_water, time_stamp=timestamp_str)   # TODO
+            water_mask = None
+
+            # combine masks
+            combined_mask = self.combine_masks(cloud_mask, buildup_mask, green_mask, water_mask)
+            self.df.at[i, "combined_mask"] = [combined_mask]
+
+            # calculate area % of masks
+            cloud_pct, buildup_pct, green_pct, water_pct, empty_pct = self.calculate_areas_pct(combined_mask)
+
+            # save evolution row
+            with open(evolution_csv_path, "a") as f:
+                f.write(
+                    f"{row["time_stamp"]},{row["cloud_coverage_api"]},{cloud_pct},{buildup_pct},{green_pct},{water_pct},{empty_pct}\n")
+
+            # save combined mask as .npy
+            npy_save_path = save_dir / f"{timestamp_str}_mask.npy"
+            np.save(npy_save_path, combined_mask)
+
+    @staticmethod
+    def calculate_areas_pct(combined_mask) -> tuple[float]:
+        total_pixels = combined_mask.shape[0] * combined_mask.shape[1]
+
+        cloud_pct = np.sum(np.all(combined_mask == [255, 255, 255], axis=-1)) / total_pixels * 100
+        buildup_pct = np.sum(np.all(combined_mask == [255, 0, 0], axis=-1)) / total_pixels * 100
+        green_pct = np.sum(np.all(combined_mask == [0, 255, 0], axis=-1)) / total_pixels * 100
+        water_pct = np.sum(np.all(combined_mask == [0, 0, 255], axis=-1)) / total_pixels * 100
+        empty_pct = np.sum(np.all(combined_mask == [0, 0, 0], axis=-1)) / total_pixels * 100
+
+        return cloud_pct, buildup_pct, green_pct, water_pct, empty_pct
+
+    @staticmethod
+    def combine_masks(cloud_mask, red_mask, green_mask, blue_mask=None) -> np.array:
+        h, w, _ = cloud_mask.shape
+        combined = np.full((h, w, 3), np.nan, dtype=float)  # Init with NaNs
+
+        # Step 1: Clouds (white)
+        cloud_free_mask = (cloud_mask[..., 0] == 0) & (cloud_mask[..., 1] == 0) & (cloud_mask[..., 2] == 0)
+        combined[cloud_free_mask] = [255, 255, 255]
+
+        # Step 2: Buildings (red)
+        nan_pixels = np.isnan(combined[..., 0])
+        red_pixels = (red_mask[..., 0] == 255) & (red_mask[..., 1] == 0) & (red_mask[..., 2] == 0)
+        red_selection = nan_pixels & red_pixels
+        combined[red_selection] = [255, 0, 0]
+
+        # Step 3: Green areas
+        nan_pixels = np.isnan(combined[..., 0])
+        green_pixels = (green_mask[..., 0] == 0) & (green_mask[..., 1] == 255) & (green_mask[..., 2] == 0)
+        green_selection = nan_pixels & green_pixels
+        combined[green_selection] = [0, 255, 0]
+
+        # Step 4: Optional blue mask
+        if blue_mask is not None:
+            nan_pixels = np.isnan(combined[..., 0])
+            blue_pixels = (blue_mask[..., 0] == 0) & (blue_mask[..., 1] == 0) & (blue_mask[..., 2] == 255)
+            blue_selection = nan_pixels & blue_pixels
+            combined[blue_selection] = [0, 0, 255]
+
+        # Step 5: Fill remaining NaNs with black
+        nan_pixels = np.isnan(combined[..., 0])
+        combined[nan_pixels] = [0, 0, 0]
+
+        return combined.astype(np.uint8)
+
+    def extract_good_candidates(self, threshold: int = 20) -> None:
+        """Selects time stamps with suitable cloud coverage, drop others"""
+        filter_mask = (self.df["cloud_coverage_api"] < threshold) & (
+                self.df["cloud_coverage_calculated"] < threshold)
+        self.df = self.df[filter_mask]
 
     def get_img(self, eval_script: str, time_stamp: str) -> np.ndarray:
         """
@@ -65,9 +155,27 @@ class AOISegment:
         data = request_image.get_data()  # [0] is the image
         return data[0]
 
-    def get_cloud_coverage_api(self) -> None:
+    def calculate_clouds(self) -> None:
+        for i, row in self.df.iterrows():
+            # get image from hub and save in df
+            cloud_mask = self.get_img(eval_script=self.eval_script_cloud, time_stamp=str(row["time_stamp"])[:10])
+
+            self.df["cloud_mask"] = [cloud_mask]
+
+            # calculate cloud area in %
+            red_channel = cloud_mask[:, :, 0]
+            green_channel = cloud_mask[:, :, 1]
+            blue_channel = cloud_mask[:, :, 2]
+
+            pixel_count = ((red_channel == 0) & (green_channel == 0) & (blue_channel == 0)).sum()
+            total_pixels = cloud_mask.shape[0] * cloud_mask.shape[1]
+            cloud_pct = pixel_count / total_pixels * 100
+
+            self.df["cloud_coverage_calculated"] = cloud_pct
+
+    def get_time_stamps_and_api_cloud_coverage(self) -> None:
         """
-        Gets the could coverage the api supplies
+        Gets time_stamps of available images and cloud coverage the api supplies
         """
         search_iterator = self.catalog.search(
             DataCollection.SENTINEL2_L2A,
@@ -82,80 +190,7 @@ class AOISegment:
         for result in search_iterator:
             time_stamp = result["properties"]["datetime"]
             cloud_coverage_api = result["properties"]["eo:cloud_cover"]
-            self.df_all_data.loc[len(self.df_all_data)] = [time_stamp, cloud_coverage_api, None]
-
-    def extract_good_candidates(self, threshold: int = 20) -> None:
-        """Selects time stamps of the bbox with suitable cloud coverage"""
-        filter_mask = (self.df_all_data["cloud_coverage_api"] < threshold) & (
-                self.df_all_data["cloud_coverage_calculated"] < threshold)
-        self.df_land_use_evolution = self.df_all_data[filter_mask]
-
-    def calculate_area_pct(self, area_type: Literal[
-        "cloud_coverage_calculated", "buildup_pct", "green_pct", "water_pct"]) -> float:
-        eval_script_map = {
-            "cloud_coverage_calculated": "es_clm_binary.js",
-            "buildup_pct": "es_bua_binary.js",
-            "green_pct": "es_gc_binary.js",
-            "water_pct": ""
-        }
-        script = eval_script_map[area_type]
-        if area_type == "cloud_coverage_calculated":
-            df = self.df_all_data
-        else:
-            df = self.df_land_use_evolution
-        for i, row in df.iterrows():
-            # get image from hub with appropriate evalscript
-            img = self.get_img(
-                eval_script=sentinel_hub_functions.load_eval_script(self.project_root / "evalscripts" / script),
-                time_stamp=str(row["time_stamp"])[:10])
-
-            # calculate buildup area in %
-            area_pct = self.area_from_pixels(img, area_type=area_type)
-
-            # add value to df
-            if area_type == "cloud_coverage_calculated":
-                self.df_all_data.at[i, area_type] = area_pct
-            else:
-                self.df_land_use_evolution[i, area_type] = area_pct
-
-    def calculate_rest_pcts(self) -> None:
-        """calculate area that isn't build up, water, or green"""
-        for i, row in self.df_land_use_evolution.iterrows():
-            self.df_land_use_evolution.at[i, "rest_pct"] = 100 - row["buildup_pct"] - row["green_pct"] - row["water_pct"]
-
-    @staticmethod
-    def area_from_pixels(image: np.array,
-                         area_type: Literal["cloud_coverage_calculated", "buildup_pct", "green_pct", "water_pct"]):
-        # Split the image into its color channels
-        red_channel = image[:, :, 0]
-        green_channel = image[:, :, 1]
-        blue_channel = image[:, :, 2]
-
-        if area_type == "cloud_coverage_calculated":  # expect r0,g0,g0
-            pixel_count = ((red_channel == 0) & (green_channel == 0) & (blue_channel == 0)).sum()
-
-        elif area_type == "buildup_pct":  # expect r255,g0,b0
-            pixel_count = ((red_channel == 255) & (green_channel == 0) & (blue_channel == 0)).sum()
-
-        elif area_type == "green_pct":  # expect r0,g255,b0
-            pixel_count = ((red_channel == 0) & (green_channel == 255) & (blue_channel == 0)).sum()
-
-        elif area_type == "water_pct":  # expect r0,g0,b255
-            pixel_count = ((red_channel == 0) & (green_channel == 0) & (blue_channel == 255)).sum()
-
-        else:
-            pixel_count = 0
-
-        # Count pixels and calculate the proportion
-        total_pixels = image.shape[0] * image.shape[1]
-        proportion = pixel_count / total_pixels
-
-        return proportion * 100
-
-    def save_csv(self):
-        """saves result df as csv, bbox and time internal used for naming"""
-        file_name = f"{self.time_interval[0]}_{self.time_interval[0]}_{self.bbox.min_x}_{self.bbox.min_y}_{self.bbox.max_x}_{self.bbox.max_y}.csv"
-        self.df_land_use_evolution.to_csv(self.project_root / "data" / file_name)
+            self.df.loc[len(self.df)] = [time_stamp, cloud_coverage_api, None, None, None]
 
 
 if __name__ == "__main__":
@@ -173,4 +208,4 @@ if __name__ == "__main__":
 
     # example
     aoi = AOISegment(bbox=test_bbox, time_interval=test_time_interval, configuration=config)
-    print(aoi.df_land_use_evolution)
+    aoi.run_and_save_calculations()
