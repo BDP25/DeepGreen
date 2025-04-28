@@ -9,8 +9,3 @@ Laura Conti
 ```
 python -m black .
 ```
-### Execute all tests automatically with Pytest
-
-```
-python -m pytest tests
-```
