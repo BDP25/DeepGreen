@@ -204,7 +204,7 @@ if __name__ == "__main__":
     )
     # test_time_interval = ("2017-01-01", "2024-12-31")
     # test_time_interval = ("2025-03-01", "2025-04-28")
-    test_time_interval = ("2024-03-01", "2024-05-01")
+    test_time_interval = ("2020-03-01", "2020-05-01")
 
     # example
     aoi = AOISegment(bbox=test_bbox, time_interval=test_time_interval, configuration=config)
