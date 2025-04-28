@@ -25,7 +25,7 @@ class AOISegment:
         self.eval_script_cloud = load_eval_script(str(self.project_root / "eval_scripts" / "es_clm_binary.js"))
         self.eval_script_buildup = load_eval_script(str(self.project_root / "eval_scripts" / "es_bua_binary.js"))
         self.eval_script_green = load_eval_script(str(self.project_root / "eval_scripts" / "es_gc_binary.js"))
-        # self.eval_script_water = load_eval_script(self.project_root / "eval_scripts" / "es_clm_binary.js")  # TODO
+        self.eval_script_water = load_eval_script(str(self.project_root / "eval_scripts" / "es_w_binary.js"))
 
         # data containers for statistical values
         self.df = pd.DataFrame(
@@ -64,8 +64,7 @@ class AOISegment:
             cloud_mask = np.array(row["cloud_mask"])[0]
             buildup_mask = self.get_img(eval_script=self.eval_script_buildup, time_stamp=timestamp_str)
             green_mask = self.get_img(eval_script=self.eval_script_green, time_stamp=timestamp_str)
-            # water_mask = self.get_img(eval_script=self.eval_script_water, time_stamp=timestamp_str)   # TODO
-            water_mask = None
+            water_mask = self.get_img(eval_script=self.eval_script_water, time_stamp=timestamp_str)
 
             # combine masks
             combined_mask = self.combine_masks(cloud_mask, buildup_mask, green_mask, water_mask)
@@ -96,34 +95,33 @@ class AOISegment:
         return cloud_pct, buildup_pct, green_pct, water_pct, empty_pct
 
     @staticmethod
-    def combine_masks(cloud_mask, red_mask, green_mask, blue_mask=None) -> np.array:
+    def combine_masks(cloud_mask: np.array, red_mask: np.array, green_mask: np.array, blue_mask: np.array) -> np.array:
         h, w, _ = cloud_mask.shape
         combined = np.full((h, w, 3), np.nan, dtype=float)  # Init with NaNs
 
-        # Step 1: Clouds (white)
+        # clouds (white)
         cloud_free_mask = (cloud_mask[..., 0] == 0) & (cloud_mask[..., 1] == 0) & (cloud_mask[..., 2] == 0)
         combined[cloud_free_mask] = [255, 255, 255]
 
-        # Step 2: Buildings (red)
+        # buildings (red)
         nan_pixels = np.isnan(combined[..., 0])
         red_pixels = (red_mask[..., 0] == 255) & (red_mask[..., 1] == 0) & (red_mask[..., 2] == 0)
         red_selection = nan_pixels & red_pixels
         combined[red_selection] = [255, 0, 0]
 
-        # Step 3: Green areas
+        # water (blue)
         nan_pixels = np.isnan(combined[..., 0])
-        green_pixels = (green_mask[..., 0] == 0) & (green_mask[..., 1] == 255) & (green_mask[..., 2] == 0)
-        green_selection = nan_pixels & green_pixels
+        blue_mask_pixels = (blue_mask[..., 0] == 0) & (blue_mask[..., 1] == 0) & (blue_mask[..., 2] == 255)
+        blue_selection = nan_pixels & blue_mask_pixels
+        combined[blue_selection] = [0, 0, 255]
+
+        # green areas (green)
+        nan_pixels = np.isnan(combined[..., 0])
+        green_mask_pixels = (green_mask[..., 0] == 0) & (green_mask[..., 1] == 255) & (green_mask[..., 2] == 0)
+        green_selection = nan_pixels & green_mask_pixels
         combined[green_selection] = [0, 255, 0]
 
-        # Step 4: Optional blue mask
-        if blue_mask is not None:
-            nan_pixels = np.isnan(combined[..., 0])
-            blue_pixels = (blue_mask[..., 0] == 0) & (blue_mask[..., 1] == 0) & (blue_mask[..., 2] == 255)
-            blue_selection = nan_pixels & blue_pixels
-            combined[blue_selection] = [0, 0, 255]
-
-        # Step 5: Fill remaining NaNs with black
+        # remaining (black)
         nan_pixels = np.isnan(combined[..., 0])
         combined[nan_pixels] = [0, 0, 0]
 
@@ -167,7 +165,7 @@ class AOISegment:
             green_channel = cloud_mask[:, :, 1]
             blue_channel = cloud_mask[:, :, 2]
 
-            pixel_count = ((red_channel == 0) & (green_channel == 0) & (blue_channel == 0)).sum()
+            pixel_count = np.sum((red_channel == 0) & (green_channel == 0) & (blue_channel == 0))
             total_pixels = cloud_mask.shape[0] * cloud_mask.shape[1]
             cloud_pct = pixel_count / total_pixels * 100
 
@@ -202,10 +200,11 @@ if __name__ == "__main__":
 
     # area and time
     test_bbox = BBox(
-        bbox=(8.629496, 47.5022965, 8.757201, 47.58301), crs=CRS.WGS84
+        bbox=(8.477, 47.336, 8.605, 47.417), crs=CRS.WGS84
     )
-    test_time_interval = ("2025-03-01", "2025-05-01")
-    # test_time_interval = ("2024-06-19", "2024-06-20")
+    # test_time_interval = ("2017-01-01", "2024-12-31")
+    # test_time_interval = ("2025-03-01", "2025-04-28")
+    test_time_interval = ("2024-03-01", "2024-05-01")
 
     # example
     aoi = AOISegment(bbox=test_bbox, time_interval=test_time_interval, configuration=config)
