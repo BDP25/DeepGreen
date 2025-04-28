@@ -61,7 +61,7 @@ class AOISegment:
             timestamp_str = str(row["time_stamp"])[:10]
 
             # get masks
-            cloud_mask = np.array(row["cloud_mask"])
+            cloud_mask = np.array(row["cloud_mask"])[0]
             buildup_mask = self.get_img(eval_script=self.eval_script_buildup, time_stamp=timestamp_str)
             green_mask = self.get_img(eval_script=self.eval_script_green, time_stamp=timestamp_str)
             # water_mask = self.get_img(eval_script=self.eval_script_water, time_stamp=timestamp_str)   # TODO
@@ -84,7 +84,7 @@ class AOISegment:
             np.save(npy_save_path, combined_mask)
 
     @staticmethod
-    def calculate_areas_pct(combined_mask) -> tuple[float]:
+    def calculate_areas_pct(combined_mask) -> tuple[float, float, float, float, float]:
         total_pixels = combined_mask.shape[0] * combined_mask.shape[1]
 
         cloud_pct = np.sum(np.all(combined_mask == [255, 255, 255], axis=-1)) / total_pixels * 100
@@ -160,7 +160,7 @@ class AOISegment:
             # get image from hub and save in df
             cloud_mask = self.get_img(eval_script=self.eval_script_cloud, time_stamp=str(row["time_stamp"])[:10])
 
-            self.df["cloud_mask"] = [cloud_mask]
+            self.df.at[i, "cloud_mask"] = [cloud_mask]
 
             # calculate cloud area in %
             red_channel = cloud_mask[:, :, 0]
@@ -171,7 +171,7 @@ class AOISegment:
             total_pixels = cloud_mask.shape[0] * cloud_mask.shape[1]
             cloud_pct = pixel_count / total_pixels * 100
 
-            self.df["cloud_coverage_calculated"] = cloud_pct
+            self.df.at[i, "cloud_coverage_calculated"] = cloud_pct
 
     def get_time_stamps_and_api_cloud_coverage(self) -> None:
         """
@@ -204,7 +204,8 @@ if __name__ == "__main__":
     test_bbox = BBox(
         bbox=(8.629496, 47.5022965, 8.757201, 47.58301), crs=CRS.WGS84
     )
-    test_time_interval = ("2024-06-19", "2024-06-20")
+    test_time_interval = ("2025-03-01", "2025-05-01")
+    # test_time_interval = ("2024-06-19", "2024-06-20")
 
     # example
     aoi = AOISegment(bbox=test_bbox, time_interval=test_time_interval, configuration=config)
