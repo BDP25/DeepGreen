@@ -642,7 +642,7 @@ def calculate_red_coverage(image, red_threshold=50, factor=1.2):
 
 def calculate_cc(AOI_CATALOG, AOI_BBOX_MAP, resolution, CONFIG):
     AOI_CATALOG_2 = {}
-    evalscript = load_evalscript("evalscripts/es_true_color_clm.js")
+    evalscript = load_evalscript("eval_scripts/es_true_color_clm.js")
     time_per_img = 2.42  # seconds
     print(f"Calculating Cloud Coverage")
     n_imgs = sum(

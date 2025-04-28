@@ -52,7 +52,7 @@ def calculate_cloud_coverage(
 ) -> dict[str, dict[str, list[float | str]]]:
     aoi_dict = {}
     eval_script = sentinel_hub_functions.load_eval_script(
-        "evalscripts/es_true_color_clm.js"
+        "eval_scripts/es_true_color_clm.js"
     )
     for aoi_id, aoi_recs in aoi_catalog_dict.items():
         aoi_recs = aoi_catalog_dict[aoi_id]
