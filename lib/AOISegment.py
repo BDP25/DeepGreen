@@ -59,6 +59,10 @@ class AOISegment:
         self.extract_good_candidates()
         for i, row in self.df.iterrows():
             timestamp_str = str(row["time_stamp"])[:10]
+            npy_save_path = save_dir / f"{timestamp_str}_mask.npy"
+            if npy_save_path.exists():
+                print(f"Skipping {timestamp_str} - data already exists.")
+                continue
 
             # get masks
             cloud_mask = np.array(row["cloud_mask"])[0]
@@ -79,7 +83,7 @@ class AOISegment:
                     f"{row["time_stamp"]},{row["cloud_coverage_api"]},{cloud_pct},{buildup_pct},{green_pct},{water_pct},{empty_pct}\n")
 
             # save combined mask as .npy
-            npy_save_path = save_dir / f"{timestamp_str}_mask.npy"
+
             np.save(npy_save_path, combined_mask)
 
     @staticmethod
