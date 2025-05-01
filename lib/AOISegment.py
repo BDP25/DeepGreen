@@ -4,7 +4,6 @@ import pandas as pd
 from git import Repo
 from pathlib import Path
 from dotenv import load_dotenv
-from lib.utils import load_eval_script
 from sentinelhub import BBox, SentinelHubCatalog, DataCollection, CRS, SHConfig, SentinelHubRequest, bbox_to_dimensions, \
     MimeType
 
@@ -24,9 +23,9 @@ class AOISegment:
         # eval scripts
         self.eval_script_cloud = load_eval_script(str(self.project_root / "eval_scripts" / "es_clm_binary.js"))
         # TODO: change to eval scripts that return probability for buildup, green and water
-        self.eval_script_buildup = load_eval_script(str(self.project_root / "eval_scripts" / "es_bua_binary.js"))
-        self.eval_script_green = load_eval_script(str(self.project_root / "eval_scripts" / "es_gc_binary.js"))
-        self.eval_script_water = load_eval_script(str(self.project_root / "eval_scripts" / "es_w_binary.js"))
+        self.eval_script_buildup = self.load_eval_script(str(self.project_root / "eval_scripts" / "es_bua_binary.js"))
+        self.eval_script_green = self.load_eval_script(str(self.project_root / "eval_scripts" / "es_gc_binary.js"))
+        self.eval_script_water = self.load_eval_script(str(self.project_root / "eval_scripts" / "es_w_binary.js"))
 
         # data containers for statistical values
         self.df = pd.DataFrame(
@@ -129,6 +128,12 @@ class AOISegment:
         combined[water_mask_final] = [0, 0, 255]
 
         return combined.astype(np.uint8)
+
+    @staticmethod
+    def load_eval_script(path: str) -> str:
+        with open(path, "r") as f:
+            eval_script = f.read()
+        return eval_script
 
     def extract_good_candidates(self, threshold: int = 20) -> None:
         """Selects time stamps with suitable cloud coverage, drop others"""
