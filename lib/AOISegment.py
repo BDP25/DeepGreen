@@ -21,7 +21,7 @@ class AOISegment:
         self.project_root = Path(repo.git.rev_parse("--show-toplevel"))
 
         # eval scripts
-        self.eval_script_cloud = load_eval_script(str(self.project_root / "eval_scripts" / "es_clm_binary.js"))
+        self.eval_script_cloud = self.load_eval_script(str(self.project_root / "eval_scripts" / "es_clm_binary.js"))
         # TODO: change to eval scripts that return probability for buildup, green and water
         self.eval_script_buildup = self.load_eval_script(str(self.project_root / "eval_scripts" / "es_bua_binary.js"))
         self.eval_script_green = self.load_eval_script(str(self.project_root / "eval_scripts" / "es_gc_binary.js"))
