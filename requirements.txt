@@ -10,3 +10,5 @@ pillow~=11.1.0
 GitPython~=3.1.44
 ipython~=9.2.0
 matplotlib~=3.10.1
+pytest~=8.3.5
+pytest-mock>=3.140.0

@@ -4,7 +4,7 @@ import pandas as pd
 from git import Repo
 from pathlib import Path
 from dotenv import load_dotenv
-from lib.utils import load_eval_script
+from sentinelhub.api.catalog import CatalogSearchIterator
 from sentinelhub import BBox, SentinelHubCatalog, DataCollection, CRS, SHConfig, SentinelHubRequest, bbox_to_dimensions, \
     MimeType
 
@@ -22,11 +22,10 @@ class AOISegment:
         self.project_root = Path(repo.git.rev_parse("--show-toplevel"))
 
         # eval scripts
-        self.eval_script_cloud = load_eval_script(str(self.project_root / "eval_scripts" / "es_clm_binary.js"))
-        # TODO: change to eval scripts that return probability for buildup, green and water
-        self.eval_script_buildup = load_eval_script(str(self.project_root / "eval_scripts" / "es_bua_binary.js"))
-        self.eval_script_green = load_eval_script(str(self.project_root / "eval_scripts" / "es_gc_binary.js"))
-        self.eval_script_water = load_eval_script(str(self.project_root / "eval_scripts" / "es_w_binary.js"))
+        self.eval_script_cloud = self.load_eval_script(str(self.project_root / "eval_scripts" / "es_clm_binary.js"))
+        self.eval_script_buildup = self.load_eval_script(str(self.project_root / "eval_scripts" / "es_bua_binary.js"))
+        self.eval_script_green = self.load_eval_script(str(self.project_root / "eval_scripts" / "es_gc_binary.js"))
+        self.eval_script_water = self.load_eval_script(str(self.project_root / "eval_scripts" / "es_w_binary.js"))
 
         # data containers for statistical values
         self.df = pd.DataFrame(
@@ -99,36 +98,43 @@ class AOISegment:
         return cloud_pct, buildup_pct, green_pct, water_pct, empty_pct
 
     @staticmethod
-    def combine_masks(cloud_mask: np.array, buildup_mask: np.array, green_mask: np.array, water_mask: np.array,
-                      threshold: float = 0.8) -> np.array:
-        # initialise in same shape and as black (0,0,0)
-        h, w = cloud_mask.shape
-        combined = np.zeros((h, w, 3), dtype=np.uint8)
+    def combine_masks(cloud_mask: np.array, red_mask: np.array, green_mask: np.array, blue_mask: np.array) -> np.array:
+        h, w, _ = cloud_mask.shape
+        combined = np.full((h, w, 3), np.nan, dtype=float)  # Init with NaNs
 
-        # keep clouds as clouds
-        is_cloud = cloud_mask == 1
-        combined[is_cloud] = [255, 255, 255]
-        not_cloud = ~is_cloud
+        # clouds (white)
+        cloud_free_mask = (cloud_mask[..., 0] == 0) & (cloud_mask[..., 1] == 0) & (cloud_mask[..., 2] == 0)
+        combined[cloud_free_mask] = [255, 255, 255]
 
-        # stack masks and find highes probability index
-        stacked = np.stack([buildup_mask, green_mask, water_mask], axis=-1)  # shape (h, w, 3)
-        max_vals = np.max(stacked, axis=-1)
-        max_indices = np.argmax(stacked, axis=-1)
+        # buildings (red)
+        nan_pixels = np.isnan(combined[..., 0])
+        red_pixels = (red_mask[..., 0] == 255) & (red_mask[..., 1] == 0) & (red_mask[..., 2] == 0)
+        red_selection = nan_pixels & red_pixels
+        combined[red_selection] = [255, 0, 0]
 
-        # apply threshold
-        mask_high_prob = (max_vals >= threshold) & not_cloud
+        # water (blue)
+        nan_pixels = np.isnan(combined[..., 0])
+        blue_mask_pixels = (blue_mask[..., 0] == 0) & (blue_mask[..., 1] == 0) & (blue_mask[..., 2] == 255)
+        blue_selection = nan_pixels & blue_mask_pixels
+        combined[blue_selection] = [0, 0, 255]
 
-        # create mask for all classes and assign colors
-        # black pixels (0,0,0) remain black
-        buildup_mask_final = (max_indices == 0) & mask_high_prob
-        green_mask_final = (max_indices == 1) & mask_high_prob
-        water_mask_final = (max_indices == 2) & mask_high_prob
+        # green areas (green)
+        nan_pixels = np.isnan(combined[..., 0])
+        green_mask_pixels = (green_mask[..., 0] == 0) & (green_mask[..., 1] == 255) & (green_mask[..., 2] == 0)
+        green_selection = nan_pixels & green_mask_pixels
+        combined[green_selection] = [0, 255, 0]
 
-        combined[buildup_mask_final] = [255, 0, 0]
-        combined[green_mask_final] = [0, 255, 0]
-        combined[water_mask_final] = [0, 0, 255]
+        # remaining (black)
+        nan_pixels = np.isnan(combined[..., 0])
+        combined[nan_pixels] = [0, 0, 0]
 
         return combined.astype(np.uint8)
+
+    @staticmethod
+    def load_eval_script(path: str) -> str:
+        with open(path, "r") as f:
+            eval_script = f.read()
+        return eval_script
 
     def extract_good_candidates(self, threshold: int = 20) -> None:
         """Selects time stamps with suitable cloud coverage, drop others"""
@@ -178,6 +184,16 @@ class AOISegment:
         """
         Gets time_stamps of available images and cloud coverage the api supplies
         """
+        search_iterator = self.send_catalogue_request()
+        for result in search_iterator:
+            time_stamp = result["properties"]["datetime"]
+            cloud_coverage_api = result["properties"]["eo:cloud_cover"]
+            self.df.loc[len(self.df)] = [time_stamp, cloud_coverage_api, None, None, None]
+
+    def send_catalogue_request(self) -> CatalogSearchIterator:
+        """
+        sends a request to the SentinelHub catalog for the desired bbox and time interval.
+        """
         search_iterator = self.catalog.search(
             DataCollection.SENTINEL2_L2A,
             bbox=self.bbox,
@@ -188,10 +204,7 @@ class AOISegment:
                 "exclude": ["id"],
             },
         )
-        for result in search_iterator:
-            time_stamp = result["properties"]["datetime"]
-            cloud_coverage_api = result["properties"]["eo:cloud_cover"]
-            self.df.loc[len(self.df)] = [time_stamp, cloud_coverage_api, None, None, None]
+        return search_iterator
 
 
 if __name__ == "__main__":

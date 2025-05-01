@@ -1,0 +1,140 @@
+[
+  {
+    "properties": {
+      "datetime": "2020-05-01T10:27:52Z",
+      "eo:cloud_cover": 99.37
+    }
+  },
+  {
+    "properties": {
+      "datetime": "2020-04-29T10:37:41Z",
+      "eo:cloud_cover": 71.54
+    }
+  },
+  {
+    "properties": {
+      "datetime": "2020-04-26T10:27:44Z",
+      "eo:cloud_cover": 23.1
+    }
+  },
+  {
+    "properties": {
+      "datetime": "2020-04-24T10:37:47Z",
+      "eo:cloud_cover": 26.21
+    }
+  },
+  {
+    "properties": {
+      "datetime": "2020-04-21T10:27:50Z",
+      "eo:cloud_cover": 99.93
+    }
+  },
+  {
+    "properties": {
+      "datetime": "2020-04-19T10:37:40Z",
+      "eo:cloud_cover": 90.4
+    }
+  },
+  {
+    "properties": {
+      "datetime": "2020-04-16T10:27:44Z",
+      "eo:cloud_cover": 46.14
+    }
+  },
+  {
+    "properties": {
+      "datetime": "2020-04-14T10:37:45Z",
+      "eo:cloud_cover": 5.05
+    }
+  },
+  {
+    "properties": {
+      "datetime": "2020-04-11T10:27:47Z",
+      "eo:cloud_cover": 2.44
+    }
+  },
+  {
+    "properties": {
+      "datetime": "2020-04-09T10:37:42Z",
+      "eo:cloud_cover": 7.11
+    }
+  },
+  {
+    "properties": {
+      "datetime": "2020-04-06T10:27:45Z",
+      "eo:cloud_cover": 2.34
+    }
+  },
+  {
+    "properties": {
+      "datetime": "2020-04-04T10:37:42Z",
+      "eo:cloud_cover": 2.13
+    }
+  },
+  {
+    "properties": {
+      "datetime": "2020-04-01T10:27:44Z",
+      "eo:cloud_cover": 4.39
+    }
+  },
+  {
+    "properties": {
+      "datetime": "2020-03-30T10:37:43Z",
+      "eo:cloud_cover": 93.86
+    }
+  },
+  {
+    "properties": {
+      "datetime": "2020-03-27T10:27:46Z",
+      "eo:cloud_cover": 43.42
+    }
+  },
+  {
+    "properties": {
+      "datetime": "2020-03-25T10:37:41Z",
+      "eo:cloud_cover": 5.09
+    }
+  },
+  {
+    "properties": {
+      "datetime": "2020-03-22T10:27:45Z",
+      "eo:cloud_cover": 93.74
+    }
+  },
+  {
+    "properties": {
+      "datetime": "2020-03-20T10:37:43Z",
+      "eo:cloud_cover": 20.4
+    }
+  },
+  {
+    "properties": {
+      "datetime": "2020-03-17T10:27:47Z",
+      "eo:cloud_cover": 46.33
+    }
+  },
+  {
+    "properties": {
+      "datetime": "2020-03-15T10:37:42Z",
+      "eo:cloud_cover": 0.51
+    }
+  },
+  {
+    "properties": {
+      "datetime": "2020-03-12T10:27:45Z",
+      "eo:cloud_cover": 73.59
+    }
+  },
+  {
+    "properties": {
+      "datetime": "2020-03-07T10:27:46Z",
+      "eo:cloud_cover": 65.34
+    }
+  },
+  {
+    "properties": {
+      "datetime": "2020-03-02T10:27:44Z",
+      "eo:cloud_cover": 99.65
+    }
+  }
+]
