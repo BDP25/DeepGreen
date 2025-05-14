@@ -5,7 +5,7 @@ from sentinelhub import bbox_to_dimensions, CRS, BBox
 
 
 def segment_aoi(
-        aoi: BBox, resolution: int = 10, output: Literal["grid", "flat"] = "grid"
+    aoi: BBox, resolution: int = 10, output: Literal["grid", "flat"] = "grid"
 ) -> np.array:
     """
     segments the given BBox into chunks based on the passed resolution
@@ -44,9 +44,7 @@ def segment_aoi(
 
 
 if __name__ == "__main__":
-    bbox = BBox(
-        bbox=(8.477, 47.336, 8.605, 47.417), crs=CRS.WGS84
-    )
-    segments = segment_aoi(bbox)
-    print(segments)
-
+    # Example Usage
+    bbox = BBox(bbox=(8.477, 47.336, 8.605, 48.417), crs=CRS.WGS84)
+    segments = segment_aoi(bbox, output="grid")
+    print(segments.ndim)
