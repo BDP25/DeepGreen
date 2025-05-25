@@ -3,8 +3,25 @@
 Authors: Alex Leccadito and Laura Conti
 
 ## Table of Contents
+<!-- TOC -->
+* [DeepGreen: Land Cover Evolution Analysis Using Sentinel-2](#deepgreen-land-cover-evolution-analysis-using-sentinel-2)
+  * [Table of Contents](#table-of-contents)
+  * [Project Description](#project-description)
+  * [Setup](#setup)
+    * [Requirements](#requirements)
+    * [Sentinel Hub Login](#sentinel-hub-login)
+    * [Test Execution](#test-execution)
+  * [Repository Structure and Files](#repository-structure-and-files)
+  * [`AOISegment` Class](#aoisegment-class)
+    * [Parameters](#parameters)
+    * [Primary Functionality](#primary-functionality)
+    * [Supporting Methods](#supporting-methods)
+    * [Data Output](#data-output)
+    * [Usage Example](#usage-example)
+  * [Analysis and Visualisation Notebooks](#analysis-and-visualisation-notebooks)
+  * [Contributors](#contributors)
+<!-- TOC -->
 
-TODO
 
 ## Project Description
 
@@ -58,7 +75,7 @@ python -m pytest tests
 │   ├── es_gc_binary.js
 │   └── es_w_binary.js 
 │
-├── images/  # for visualiation purposes
+├── images/  # for visualisation purposes
 │   ├── Winterthur-2024-06-19.jpeg
 │   └── Zurich-2025-04-23.jpeg
 │
@@ -188,12 +205,16 @@ generated data, results were saved locally for further processing and are not in
 The notebook `area_visualisation.ipynb` demonstrates a simple example of how segmentation masks can be generated and
 visualized.
 
-🛠 TODO: Add description for `file_aggregation.ipynb`.
+The notebook `priority_aggregation.ipynb` shows how we did the priority aggregation for a set of images where we fill
+empty/invalid pixels (cloud and empty spaces) by priority: building, water body, green space.
+
+🛠 TODO ALEX: Add description for `temporal_aggregation.ipynb`.
 
 The notebook `time_evolution.ipynb` allows you to create an animation from a folder containing .npy mask files. Whether
 the files have been aggregated or not does not affect the method—visualization works the same either way.
 
 ## Contributors
+
 [![Laura](https://github.com/conlalaura.png?size=100)](https://github.com/conlalaura)
 [![Alex](https://github.com/leccato.png?size=100)](https://github.com/leccato)
 
