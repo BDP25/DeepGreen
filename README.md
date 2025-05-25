@@ -208,7 +208,7 @@ visualized.
 The notebook `priority_aggregation.ipynb` shows how we did the priority aggregation for a set of images where we fill
 empty/invalid pixels (cloud and empty spaces) by priority: building, water body, green space.
 
-🛠 TODO ALEX: Add description for `temporal_aggregation.ipynb`.
+The notebook `file_aggregation_temporal.ipynb` demonstrates how we create 2024 land-cover composites by first enforcing temporal consistency across masks and then filling any remaining empty or cloud pixels in order of priority—building, water body, green space.
 
 The notebook `time_evolution.ipynb` allows you to create an animation from a folder containing .npy mask files. Whether
 the files have been aggregated or not does not affect the method—visualization works the same either way.
